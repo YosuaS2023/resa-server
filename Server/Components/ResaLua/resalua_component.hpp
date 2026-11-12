@@ -6,6 +6,7 @@
 #pragma once
 
 #include "resalua.hpp"
+#include "resource.hpp"
 #include "resource_manager.hpp"
 #include "event_manager.hpp"
 #include <Server/Components/Console/console.hpp>
