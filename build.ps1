@@ -65,12 +65,18 @@ if (-not (Test-Path build)) {
     }
     catch [System.Management.Automation.CommandNotFoundException] {
         Write-Warning "Conan or CMake not found in PATH; adding Python scripts to PATH."
-        $PIP_SCRIPTS_PATH = & python3 -c "import os,sysconfig;print(sysconfig.get_path('scripts',f'{os.name}_user'))"
+        $SCRIPT_PATHS = & python3 -c "import os,sysconfig;print(sysconfig.get_path('scripts'));print(sysconfig.get_path('scripts',f'{os.name}_user'))"
         if ($LASTEXITCODE -eq 0) {
-            $Env:Path += ";$PIP_SCRIPTS_PATH;"
-            $USER_ENV = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
-            $USER_ENV += ";$PIP_SCRIPTS_PATH;"
-            [System.Environment]::SetEnvironmentVariable('Path', $USER_ENV, [System.EnvironmentVariableTarget]::User)
+            foreach ($p in $SCRIPT_PATHS) {
+                if ($p -and (Test-Path $p)) {
+                    $Env:Path += ";$p;"
+                    $USER_ENV = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
+                    if ($USER_ENV -notlike "*$p*") {
+                        $USER_ENV += ";$p;"
+                        [System.Environment]::SetEnvironmentVariable('Path', $USER_ENV, [System.EnvironmentVariableTarget]::User)
+                    }
+                }
+            }
         }
         else {
             throw "Could not determine Python scripts path. Please add it to PATH manually."
