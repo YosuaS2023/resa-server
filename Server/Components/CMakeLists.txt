@@ -28,11 +28,6 @@ if(BUILD_RESA_LUA_COMPONENT)
 	add_subdirectory(ResaLua)
 endif()
 
-# Pawn
-if(BUILD_PAWN_COMPONENT)
-	add_subdirectory(Pawn)
-endif()
-
 # SQLite
 if(BUILD_SQLITE_COMPONENT)
 	add_subdirectory(Databases)

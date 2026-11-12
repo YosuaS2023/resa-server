@@ -133,7 +133,6 @@ endfunction()
 
 set(BUILD_SERVER TRUE CACHE BOOL "Whether to build the open.mp server")
 set(BUILD_RESA_LUA_COMPONENT TRUE CACHE BOOL "Whether to build the Resa Lua Resource Manager component")
-set(BUILD_PAWN_COMPONENT TRUE CACHE BOOL "Whether to build the PAWN component")
 set(BUILD_UNICODE_COMPONENT TRUE CACHE BOOL "Whether to build the Unicode component")
 set(BUILD_LEGACY_COMPONENTS TRUE CACHE BOOL "Whether to build the legacy components")
 set(BUILD_TEST_COMPONENTS FALSE CACHE BOOL "Whether to build the test component")
