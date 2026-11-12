@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # MSVC
 if(MSVC)
-	set(SHARED_OPENSSL TRUE CACHE BOOL "Whether to dynamically link the OpenSSL library")
+	set(SHARED_OPENSSL FALSE CACHE BOOL "Whether to dynamically link the OpenSSL library")
 	set(CMAKE_CXX_STANDARD_REQUIRED ON)
 	add_link_options("/LARGEADDRESSAWARE")
 	# Use strict intermediate floating-point precision
