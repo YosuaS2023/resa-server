@@ -228,7 +228,7 @@ static int Lua_SendClientMessage(lua_State* L) {
 
     IPlayer* player = core->getPlayers().get(id);
     if (player) {
-        player->sendClientMessage(Colour(colour), StringView(text));
+        player->sendClientMessage(Colour::FromRGBA(colour), StringView(text));
         lua_pushboolean(L, true);
     } else {
         lua_pushboolean(L, false);
@@ -243,7 +243,7 @@ static int Lua_SendClientMessageToAll(lua_State* L) {
     ICore* core = ResourceManager::Get().GetCore();
     if (!core) return 0;
 
-    core->getPlayers().sendClientMessageToAll(Colour(colour), StringView(text));
+    core->getPlayers().sendClientMessageToAll(Colour::FromRGBA(colour), StringView(text));
     return 0;
 }
 

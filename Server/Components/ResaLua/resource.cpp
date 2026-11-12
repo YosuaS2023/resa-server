@@ -85,11 +85,13 @@ bool Resource::LoadManifest() {
     luaL_dostring(L, dsl);
 
     // C callbacks for DSL
-    lua_register(L, "__set_author", [](lua_State* L) -> int {
+    lua_pushlightuserdata(L, this);
+    lua_pushcclosure(L, [](lua_State* L) -> int {
         Resource* self = static_cast<Resource*>(lua_touserdata(L, lua_upvalueindex(1)));
         if (self && lua_isstring(L, 1)) self->meta_.author = lua_tostring(L, 1);
         return 0;
-    });
+    }, 1);
+    lua_setglobal(L, "__set_author");
 
     lua_pushlightuserdata(L, this);
     lua_pushcclosure(L, [](lua_State* L) -> int {
