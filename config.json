@@ -1,0 +1,16 @@
+{
+  "name": "resa-multiplayer Development Server",
+  "max_players": 50,
+  "language": "English / Indonesian",
+  "website": "https://github.com/resa-multiplayer",
+  "components": [
+    "ResaLua",
+    "Vehicles",
+    "Objects",
+    "Pickups",
+    "Checkpoints",
+    "TextDraws",
+    "TextLabels",
+    "Console"
+  ]
+}
