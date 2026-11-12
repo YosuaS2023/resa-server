@@ -38,6 +38,7 @@ jobs:
     runs-on: windows-2022
 
     strategy:
+      fail-fast: false
       matrix:
         arch: [Win32, x64]
 
@@ -131,6 +132,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         arch: [x86, x86_64]
         ssl: [dynamic, static]
@@ -242,6 +244,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     strategy:
+      fail-fast: false
       matrix:
         arch: [arm32, aarch64]
         ssl: [dynamic, static]
@@ -316,6 +319,7 @@ jobs:
     runs-on: macos-latest
 
     strategy:
+      fail-fast: false
       matrix:
         ssl: [dynamic, static]
 
