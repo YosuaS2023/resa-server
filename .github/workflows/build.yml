@@ -114,7 +114,6 @@ jobs:
           artifact_name="open.mp-win-${{ matrix.arch }}-${version}"
           echo "artifact_name=${artifact_name}" >> $GITHUB_OUTPUT
           cd build/Output/*
-          powershell -NoLogo -NoProfile -Command "Get-ChildItem -Path \"$HOME/.conan2\", \"$GITHUB_WORKSPACE/build\" -Include 'libcrypto*.dll', 'libssl*.dll' -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item `$_.FullName -Destination 'Server' -Force }"
           if [ -d "$GITHUB_WORKSPACE/resources" ]; then
             cp -r "$GITHUB_WORKSPACE/resources" Server/
           fi
