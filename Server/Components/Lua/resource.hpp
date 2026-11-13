@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "resalua.hpp"
+#include "lua_defs.hpp"
 
 namespace Resa {
 

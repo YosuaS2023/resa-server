@@ -4,7 +4,7 @@
   "language": "English / Indonesian",
   "website": "https://github.com/resa-multiplayer",
   "components": [
-    "ResaLua",
+    "Lua",
     "Vehicles",
     "Objects",
     "Pickups",

@@ -8,6 +8,7 @@
 #include "resource_manager.hpp"
 #include "event_manager.hpp"
 #include <Server/Components/Vehicles/vehicles.hpp>
+#include <Server/Components/Dialogs/dialogs.hpp>
 #include <sstream>
 
 namespace Resa {
@@ -361,6 +362,124 @@ static int Lua_GetVehiclePos(lua_State* L) {
     return 0;
 }
 
+// Dialog API
+static int Lua_ShowPlayerDialog(lua_State* L) {
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    int dialogId = static_cast<int>(luaL_checkinteger(L, 2));
+    int style = static_cast<int>(luaL_checkinteger(L, 3));
+    const char* title = luaL_checkstring(L, 4);
+    const char* body = luaL_checkstring(L, 5);
+    const char* button1 = luaL_checkstring(L, 6);
+    const char* button2 = luaL_optstring(L, 7, "");
+
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+
+    IPlayer* player = core->getPlayers().get(id);
+    if (!player) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    IPlayerDialogData* data = queryExtension<IPlayerDialogData>(player);
+    if (!data) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    if (dialogId == INVALID_DIALOG_ID) {
+        data->hide(*player);
+    } else {
+        data->show(*player, dialogId & 0xFFFF, static_cast<DialogStyle>(style), title, body, button1, button2);
+    }
+    lua_pushboolean(L, true);
+    return 1;
+}
+
+static int Lua_HidePlayerDialog(lua_State* L) {
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+
+    IPlayer* player = core->getPlayers().get(id);
+    if (!player) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    IPlayerDialogData* data = queryExtension<IPlayerDialogData>(player);
+    if (!data) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    data->hide(*player);
+    lua_pushboolean(L, true);
+    return 1;
+}
+
+static int Lua_GetPlayerDialog(lua_State* L) {
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+
+    IPlayer* player = core->getPlayers().get(id);
+    if (!player) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    IPlayerDialogData* data = queryExtension<IPlayerDialogData>(player);
+    if (!data) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    lua_pushinteger(L, data->getActiveID());
+    return 1;
+}
+
+static int Lua_GetPlayerDialogData(lua_State* L) {
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+
+    IPlayer* player = core->getPlayers().get(id);
+    if (!player) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    IPlayerDialogData* data = queryExtension<IPlayerDialogData>(player);
+    if (!data) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    int dialogId = INVALID_DIALOG_ID;
+    DialogStyle style{};
+    StringView title{};
+    StringView body{};
+    StringView button1{};
+    StringView button2{};
+    data->get(dialogId, style, title, body, button1, button2);
+
+    lua_newtable(L);
+    lua_pushinteger(L, dialogId);
+    lua_setfield(L, -2, "dialogId");
+    lua_pushinteger(L, static_cast<int>(style));
+    lua_setfield(L, -2, "style");
+    lua_pushlstring(L, title.data(), title.length());
+    lua_setfield(L, -2, "title");
+    lua_pushlstring(L, body.data(), body.length());
+    lua_setfield(L, -2, "body");
+    lua_pushlstring(L, button1.data(), button1.length());
+    lua_setfield(L, -2, "button1");
+    lua_pushlstring(L, button2.data(), button2.length());
+    lua_setfield(L, -2, "button2");
+    return 1;
+}
+
 void RegisterBindings(lua_State* L, Resource* resource) {
     // Store resource pointer in Lua registry
     lua_pushstring(L, "__resa_resource");
@@ -394,6 +513,32 @@ void RegisterBindings(lua_State* L, Resource* resource) {
     lua_register(L, "DestroyVehicle", Lua_DestroyVehicle);
     lua_register(L, "SetVehiclePos", Lua_SetVehiclePos);
     lua_register(L, "GetVehiclePos", Lua_GetVehiclePos);
+
+    // Dialogs
+    lua_register(L, "ShowPlayerDialog", Lua_ShowPlayerDialog);
+    lua_register(L, "HidePlayerDialog", Lua_HidePlayerDialog);
+    lua_register(L, "GetPlayerDialog", Lua_GetPlayerDialog);
+    lua_register(L, "GetPlayerDialogData", Lua_GetPlayerDialogData);
+
+    // Dialog style constants
+    lua_pushinteger(L, DialogStyle_MSGBOX);
+    lua_setglobal(L, "DIALOG_STYLE_MSGBOX");
+    lua_pushinteger(L, DialogStyle_INPUT);
+    lua_setglobal(L, "DIALOG_STYLE_INPUT");
+    lua_pushinteger(L, DialogStyle_LIST);
+    lua_setglobal(L, "DIALOG_STYLE_LIST");
+    lua_pushinteger(L, DialogStyle_PASSWORD);
+    lua_setglobal(L, "DIALOG_STYLE_PASSWORD");
+    lua_pushinteger(L, DialogStyle_TABLIST);
+    lua_setglobal(L, "DIALOG_STYLE_TABLIST");
+    lua_pushinteger(L, DialogStyle_TABLIST_HEADERS);
+    lua_setglobal(L, "DIALOG_STYLE_TABLIST_HEADERS");
+
+    // Dialog response constants
+    lua_pushinteger(L, DialogResponse_Right);
+    lua_setglobal(L, "DIALOG_RESPONSE_RIGHT");
+    lua_pushinteger(L, DialogResponse_Left);
+    lua_setglobal(L, "DIALOG_RESPONSE_LEFT");
 
     // Initialise empty exports table
     lua_newtable(L);

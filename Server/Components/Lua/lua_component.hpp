@@ -5,27 +5,29 @@
 
 #pragma once
 
-#include "resalua.hpp"
+#include "lua_defs.hpp"
 #include "resource.hpp"
 #include "resource_manager.hpp"
 #include "event_manager.hpp"
 #include <Server/Components/Console/console.hpp>
+#include <Server/Components/Dialogs/dialogs.hpp>
 
 namespace Resa {
 
-class ResaLuaComponent final : public IComponent,
+class LuaComponent final : public IComponent,
                                public ConsoleEventHandler,
                                public PlayerConnectEventHandler,
                                public PlayerSpawnEventHandler,
-                               public PlayerTextEventHandler {
+                               public PlayerTextEventHandler,
+                               public PlayerDialogEventHandler {
 public:
-    PROVIDE_UID(ResaLua_UID)
+    PROVIDE_UID(Lua_UID)
 
-    ResaLuaComponent() = default;
-    ~ResaLuaComponent() override = default;
+    LuaComponent() = default;
+    ~LuaComponent() override = default;
 
     StringView componentName() const override {
-        return "ResaLua";
+        return "Lua";
     }
 
     SemanticVersion componentVersion() const override {
@@ -41,6 +43,10 @@ public:
         console_ = components->queryComponent<IConsoleComponent>();
         if (console_) {
             console_->getEventDispatcher().addEventHandler(this);
+        }
+        dialogs_ = components->queryComponent<IDialogsComponent>();
+        if (dialogs_) {
+            dialogs_->getEventDispatcher().addEventHandler(this);
         }
     }
 
@@ -62,12 +68,18 @@ public:
         if (component == console_) {
             console_ = nullptr;
         }
+        if (component == dialogs_) {
+            dialogs_ = nullptr;
+        }
     }
 
     void free() override {
         ResourceManager::Get().Shutdown();
         if (console_) {
             console_->getEventDispatcher().removeEventHandler(this);
+        }
+        if (dialogs_) {
+            dialogs_->getEventDispatcher().removeEventHandler(this);
         }
         if (core_) {
             core_->getPlayers().getPlayerConnectDispatcher().removeEventHandler(this);
@@ -166,10 +178,24 @@ public:
         return false;
     }
 
+    // PlayerDialogEventHandler implementation
+    void onDialogResponse(IPlayer& player, int dialogId, DialogResponse response, int listItem, StringView inputText) override {
+        std::string text(inputText.data(), inputText.length());
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            dialogId,
+            static_cast<int>(response),
+            listItem,
+            text
+        };
+        EventManager::Get().TriggerEvent("playerDialogResponse", args);
+    }
+
 private:
     ICore* core_ = nullptr;
     IComponentList* components_ = nullptr;
     IConsoleComponent* console_ = nullptr;
+    IDialogsComponent* dialogs_ = nullptr;
 };
 
 } // namespace Resa

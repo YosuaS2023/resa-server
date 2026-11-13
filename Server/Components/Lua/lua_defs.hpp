@@ -22,7 +22,7 @@ extern "C" {
 
 namespace Resa {
 
-static constexpr UID ResaLua_UID = UID(0x524553414C554101ULL); // "RESALUA\x01"
+static constexpr UID Lua_UID = UID(0x4C55415F434F4D50ULL); // "LUA_COMP"
 
 enum class ResourceState {
     Stopped,

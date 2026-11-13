@@ -3,8 +3,8 @@
  *  Component Entry Point
  */
 
-#include "resalua_component.hpp"
+#include "lua_component.hpp"
 
 COMPONENT_ENTRY_POINT() {
-    return new Resa::ResaLuaComponent();
+    return new Resa::LuaComponent();
 }

@@ -23,9 +23,9 @@ add_subdirectory(Variables)
 add_subdirectory(Vehicles)
 add_subdirectory(NPCs)
 
-# Resa Lua (FiveM-style Modular Scripting)
-if(BUILD_RESA_LUA_COMPONENT)
-	add_subdirectory(ResaLua)
+# Lua (FiveM-style Modular Scripting)
+if(BUILD_LUA_COMPONENT)
+	add_subdirectory(Lua)
 endif()
 
 # SQLite

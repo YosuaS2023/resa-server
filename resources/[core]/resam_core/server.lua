@@ -20,7 +20,43 @@ AddEventHandler('playerCommand', function(playerId, cmd)
         local x, y, z = GetPlayerPos(playerId)
         SendClientMessage(playerId, 0xFFFF00FF, string.format("Your Position: X: %.2f, Y: %.2f, Z: %.2f", x, y, z))
     elseif cmd == "/help" then
-        SendClientMessage(playerId, 0x00FFFFFF, "Welcome to resa-multiplayer! Powered by Lua & FiveM-style Resources.")
+        ShowPlayerDialog(
+            playerId,
+            1,
+            DIALOG_STYLE_MSGBOX,
+            "Bantuan Server",
+            "Selamat datang di resa-multiplayer!\n\nPerintah yang tersedia:\n/pos - Cek koordinat posisi\n/help - Buka dialog bantuan ini\n/menu - Contoh dialog list",
+            "OK",
+            "Tutup"
+        )
+    elseif cmd == "/menu" then
+        ShowPlayerDialog(
+            playerId,
+            2,
+            DIALOG_STYLE_LIST,
+            "Menu Pilihan",
+            "1. Dapatkan Senjata\n2. Respawn Karakter\n3. Cek Health & Armour",
+            "Pilih",
+            "Batal"
+        )
+    end
+end)
+
+AddEventHandler('playerDialogResponse', function(playerId, dialogId, response, listItem, inputText)
+    print(string.format("[resam_core] Dialog Response - Player: %d, Dialog: %d, Response: %d, Item: %d, Text: '%s'",
+        playerId, dialogId, response, listItem, inputText or ""))
+
+    if dialogId == 2 and response == 1 then
+        if listItem == 0 then
+            SendClientMessage(playerId, 0x00FF00FF, "Kamu memilih opsi 1 (Senjata)!")
+        elseif listItem == 1 then
+            SpawnPlayer(playerId)
+            SendClientMessage(playerId, 0x00FF00FF, "Karakter kamu di-respawn!")
+        elseif listItem == 2 then
+            local hp = GetPlayerHealth(playerId) or 0
+            local arm = GetPlayerArmour(playerId) or 0
+            SendClientMessage(playerId, 0x00FFFFFF, string.format("Health: %.1f | Armour: %.1f", hp, arm))
+        end
     end
 end)
 

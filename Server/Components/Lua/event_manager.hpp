@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "resalua.hpp"
+#include "lua_defs.hpp"
 #include <vector>
 #include <string>
 #include <unordered_map>

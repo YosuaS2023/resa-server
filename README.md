@@ -55,7 +55,7 @@ Proyek ini dibangun dengan menggabungkan keunggulan dari proyek-proyek open-sour
 ```text
 resam/
 ├── components/                     # Komponen internal C++ server
-│   ├── resa_lua/                   # Component runtime Lua & Resource Manager
+│   ├── Lua/                        # Component runtime Lua & Resource Manager
 │   └── ...                         # Core open.mp components (Vehicles, Objects, etc.)
 ├── resources/                      # Direktori semua modular resource
 │   ├── [core]/

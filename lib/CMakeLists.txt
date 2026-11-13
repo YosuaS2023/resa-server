@@ -24,7 +24,7 @@ set_property(TARGET ttmath PROPERTY FOLDER "lib")
 
 # Lua runtime
 # -----------
-if(BUILD_RESA_LUA_COMPONENT)
+if(BUILD_LUA_COMPONENT)
 	add_subdirectory(lua)
 	GroupSourcesByFolder(lua-lib)
 	set_property(TARGET lua-lib PROPERTY FOLDER "lib")
