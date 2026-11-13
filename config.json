@@ -5,6 +5,7 @@
   "website": "https://github.com/resa-multiplayer",
   "components": [
     "Lua",
+    "Dialogs",
     "Vehicles",
     "Objects",
     "Pickups",

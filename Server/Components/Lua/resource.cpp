@@ -35,6 +35,11 @@ bool Resource::LoadManifest() {
         return false;
     }
 
+    // Reset scripts and dependencies so they don't duplicate on restart/refresh
+    meta_.serverScripts.clear();
+    meta_.sharedScripts.clear();
+    meta_.dependencies.clear();
+
     lua_State* L = luaL_newstate();
     if (!L) return false;
     luaL_openlibs(L);

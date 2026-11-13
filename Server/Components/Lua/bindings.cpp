@@ -365,11 +365,11 @@ static int Lua_GetVehiclePos(lua_State* L) {
 // Dialog API
 static int Lua_ShowPlayerDialog(lua_State* L) {
     int id = static_cast<int>(luaL_checkinteger(L, 1));
-    int dialogId = static_cast<int>(luaL_checkinteger(L, 2));
-    int style = static_cast<int>(luaL_checkinteger(L, 3));
-    const char* title = luaL_checkstring(L, 4);
-    const char* body = luaL_checkstring(L, 5);
-    const char* button1 = luaL_checkstring(L, 6);
+    int dialogId = static_cast<int>(luaL_optinteger(L, 2, 0));
+    int style = static_cast<int>(luaL_optinteger(L, 3, 0));
+    const char* title = luaL_optstring(L, 4, "");
+    const char* body = luaL_optstring(L, 5, "");
+    const char* button1 = luaL_optstring(L, 6, "OK");
     const char* button2 = luaL_optstring(L, 7, "");
 
     ICore* core = ResourceManager::Get().GetCore();

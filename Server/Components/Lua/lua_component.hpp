@@ -175,7 +175,7 @@ public:
         std::string cmd(message.data(), message.length());
         std::vector<LuaValue> args = { static_cast<int>(player.getID()), cmd };
         EventManager::Get().TriggerEvent("playerCommand", args);
-        return false;
+        return true;
     }
 
     // PlayerDialogEventHandler implementation
