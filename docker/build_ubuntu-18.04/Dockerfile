@@ -29,5 +29,4 @@ ENV CC=/usr/bin/clang-10 \
     PATH=~/.local/bin:${PATH}
 
 COPY docker-entrypoint.sh /
-RUN chmod +x /docker-entrypoint.sh
-CMD /docker-entrypoint.sh
+CMD ["sh", "/docker-entrypoint.sh"]

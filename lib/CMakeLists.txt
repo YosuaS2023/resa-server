@@ -33,7 +33,11 @@ endif()
 # MariaDB / MySQL C Connector (for LuaMySQL component)
 # ----------------------------------------------------
 if(BUILD_LUA_MYSQL_COMPONENT)
-	conan_omp_add_lib_opt(mariadb-connector-c 3.4.11 "mariadb-connector-c:with_ssl=off;mariadb-connector-c:with_curl=False;mariadb-connector-c:with_iconv=False")
+	if(WIN32)
+		conan_omp_add_lib_opt(mariadb-connector-c 3.4.11 "mariadb-connector-c:with_ssl=schannel;mariadb-connector-c:with_curl=False;mariadb-connector-c:with_iconv=False")
+	else()
+		conan_omp_add_lib_opt(mariadb-connector-c 3.4.11 "mariadb-connector-c:with_ssl=openssl;mariadb-connector-c:with_curl=False;mariadb-connector-c:with_iconv=False")
+	endif()
 endif()
 
 # JSON
