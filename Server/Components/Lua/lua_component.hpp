@@ -21,6 +21,8 @@
 #include <Server/Components/Actors/actors.hpp>
 #include <Server/Components/Variables/variables.hpp>
 #include <Server/Components/Classes/classes.hpp>
+#include <algorithm>
+#include <vector>
 
 namespace Resa {
 
@@ -107,11 +109,15 @@ public:
             core_->getPlayers().getPlayerClickDispatcher().addEventHandler(this);
         }
 
-        // Auto-start initial resources from configuration (e.g. resam_core, spawn_manager)
-        ResourceManager::Get().EnsureResource("resam_core");
-        ResourceManager::Get().EnsureResource("spawn_manager");
-        ResourceManager::Get().EnsureResource("resam_admin");
-        ResourceManager::Get().EnsureResource("resam_vehicles");
+        // Auto-start all discovered resources in resources/
+        std::vector<std::string> resourceNames;
+        for (const auto& pair : ResourceManager::Get().GetResources()) {
+            resourceNames.push_back(pair.first);
+        }
+        std::sort(resourceNames.begin(), resourceNames.end());
+        for (const auto& name : resourceNames) {
+            ResourceManager::Get().StartResource(name);
+        }
     }
 
     void onFree(IComponent* component) override {

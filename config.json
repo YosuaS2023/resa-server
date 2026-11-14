@@ -4,6 +4,8 @@
   "language": "English / Indonesian",
   "website": "https://github.com/resa-multiplayer",
   "components": [
+    "LegacyNetwork",
+    "Unicode",
     "Lua",
     "Dialogs",
     "Timers",
