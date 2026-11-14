@@ -134,7 +134,7 @@ public:
         g_PendingCallbacks.erase(this);
 
         if (!cancelled_ && resource_ && resource_->GetState() == ResourceState::Running) {
-            lua_State* L = resource_->GetLuaState();
+            lua_State* L = resource_->GetLua();
             if (L) {
                 ResultPtr prevCache = g_ActiveCache;
                 g_ActiveCache = WrapResult(result, true);
@@ -672,7 +672,7 @@ static int Lua_MySQLConnIsValid(lua_State* L) {
 
 void CleanupMySQLForResource(Resource* resource) {
     if (!resource) return;
-    lua_State* L = resource->GetLuaState();
+    lua_State* L = resource->GetLua();
     for (LuaMySQLCallback* cb : g_PendingCallbacks) {
         if (cb && cb->GetResource() == resource) {
             cb->Cancel(L);
