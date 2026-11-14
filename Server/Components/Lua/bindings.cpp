@@ -1452,7 +1452,7 @@ static int Lua_SetPlayerSpecialAction(lua_State* L) {
 
     IPlayer* player = core->getPlayers().get(id);
     if (player) {
-        player->setSpecialAction(static_cast<PlayerSpecialAction>(action));
+        player->setAction(static_cast<PlayerSpecialAction>(action));
         lua_pushboolean(L, true);
     } else {
         lua_pushboolean(L, false);
@@ -1467,7 +1467,7 @@ static int Lua_GetPlayerSpecialAction(lua_State* L) {
 
     IPlayer* player = core->getPlayers().get(id);
     if (player) {
-        lua_pushinteger(L, static_cast<int>(player->getSpecialAction()));
+        lua_pushinteger(L, static_cast<int>(player->getAction()));
     } else {
         lua_pushnil(L);
     }
