@@ -6,10 +6,12 @@
   "components": [
     "Lua",
     "Dialogs",
+    "Timers",
     "Vehicles",
     "Objects",
     "Pickups",
     "Checkpoints",
+    "Actors",
     "TextDraws",
     "TextLabels",
     "Console"

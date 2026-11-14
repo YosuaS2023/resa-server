@@ -42,6 +42,7 @@ public:
     // Cross-resource export support
     void RegisterExport(const std::string& resourceName, const std::string& exportName, int luaRef);
     int GetExportRef(const std::string& resourceName, const std::string& exportName);
+    void RemoveExportsForResource(const std::string& resourceName);
 
 private:
     ResourceManager() = default;

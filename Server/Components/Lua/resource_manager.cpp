@@ -167,4 +167,8 @@ int ResourceManager::GetExportRef(const std::string& resourceName, const std::st
     return LUA_NOREF;
 }
 
+void ResourceManager::RemoveExportsForResource(const std::string& resourceName) {
+    exports_.erase(resourceName);
+}
+
 } // namespace Resa

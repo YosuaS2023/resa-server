@@ -9,17 +9,32 @@
 #include "resource.hpp"
 #include "resource_manager.hpp"
 #include "event_manager.hpp"
+#include "bindings.hpp"
 #include <Server/Components/Console/console.hpp>
 #include <Server/Components/Dialogs/dialogs.hpp>
+#include <Server/Components/Vehicles/vehicles.hpp>
+#include <Server/Components/Pickups/pickups.hpp>
+#include <Server/Components/TextLabels/textlabels.hpp>
+#include <Server/Components/Objects/objects.hpp>
+#include <Server/Components/Timers/timers.hpp>
+#include <Server/Components/Checkpoints/checkpoints.hpp>
+#include <Server/Components/Actors/actors.hpp>
 
 namespace Resa {
 
 class LuaComponent final : public IComponent,
-                               public ConsoleEventHandler,
-                               public PlayerConnectEventHandler,
-                               public PlayerSpawnEventHandler,
-                               public PlayerTextEventHandler,
-                               public PlayerDialogEventHandler {
+                           public ConsoleEventHandler,
+                           public PlayerConnectEventHandler,
+                           public PlayerSpawnEventHandler,
+                           public PlayerTextEventHandler,
+                           public PlayerDamageEventHandler,
+                           public PlayerChangeEventHandler,
+                           public PlayerClickEventHandler,
+                           public VehicleEventHandler,
+                           public PickupEventHandler,
+                           public PlayerCheckpointEventHandler,
+                           public ActorEventHandler,
+                           public PlayerDialogEventHandler {
 public:
     PROVIDE_UID(Lua_UID)
 
@@ -48,6 +63,22 @@ public:
         if (dialogs_) {
             dialogs_->getEventDispatcher().addEventHandler(this);
         }
+        vehicles_ = components->queryComponent<IVehiclesComponent>();
+        if (vehicles_) {
+            vehicles_->getEventDispatcher().addEventHandler(this);
+        }
+        pickups_ = components->queryComponent<IPickupsComponent>();
+        if (pickups_) {
+            pickups_->getEventDispatcher().addEventHandler(this);
+        }
+        checkpoints_ = components->queryComponent<ICheckpointsComponent>();
+        if (checkpoints_) {
+            checkpoints_->getEventDispatcher().addEventHandler(this);
+        }
+        actors_ = components->queryComponent<IActorsComponent>();
+        if (actors_) {
+            actors_->getEventDispatcher().addEventHandler(this);
+        }
     }
 
     void onReady() override {
@@ -57,11 +88,16 @@ public:
             core_->getPlayers().getPlayerConnectDispatcher().addEventHandler(this);
             core_->getPlayers().getPlayerSpawnDispatcher().addEventHandler(this);
             core_->getPlayers().getPlayerTextDispatcher().addEventHandler(this);
+            core_->getPlayers().getPlayerDamageDispatcher().addEventHandler(this);
+            core_->getPlayers().getPlayerChangeDispatcher().addEventHandler(this);
+            core_->getPlayers().getPlayerClickDispatcher().addEventHandler(this);
         }
 
         // Auto-start initial resources from configuration (e.g. resam_core, spawn_manager)
         ResourceManager::Get().EnsureResource("resam_core");
         ResourceManager::Get().EnsureResource("spawn_manager");
+        ResourceManager::Get().EnsureResource("resam_admin");
+        ResourceManager::Get().EnsureResource("resam_vehicles");
     }
 
     void onFree(IComponent* component) override {
@@ -70,6 +106,18 @@ public:
         }
         if (component == dialogs_) {
             dialogs_ = nullptr;
+        }
+        if (component == vehicles_) {
+            vehicles_ = nullptr;
+        }
+        if (component == pickups_) {
+            pickups_ = nullptr;
+        }
+        if (component == checkpoints_) {
+            checkpoints_ = nullptr;
+        }
+        if (component == actors_) {
+            actors_ = nullptr;
         }
     }
 
@@ -81,10 +129,25 @@ public:
         if (dialogs_) {
             dialogs_->getEventDispatcher().removeEventHandler(this);
         }
+        if (vehicles_) {
+            vehicles_->getEventDispatcher().removeEventHandler(this);
+        }
+        if (pickups_) {
+            pickups_->getEventDispatcher().removeEventHandler(this);
+        }
+        if (checkpoints_) {
+            checkpoints_->getEventDispatcher().removeEventHandler(this);
+        }
+        if (actors_) {
+            actors_->getEventDispatcher().removeEventHandler(this);
+        }
         if (core_) {
             core_->getPlayers().getPlayerConnectDispatcher().removeEventHandler(this);
             core_->getPlayers().getPlayerSpawnDispatcher().removeEventHandler(this);
             core_->getPlayers().getPlayerTextDispatcher().removeEventHandler(this);
+            core_->getPlayers().getPlayerDamageDispatcher().removeEventHandler(this);
+            core_->getPlayers().getPlayerChangeDispatcher().removeEventHandler(this);
+            core_->getPlayers().getPlayerClickDispatcher().removeEventHandler(this);
         }
         delete this;
     }
@@ -173,9 +236,162 @@ public:
 
     bool onPlayerCommandText(IPlayer& player, StringView message) override {
         std::string cmd(message.data(), message.length());
+        DispatchCommand(static_cast<int>(player.getID()), cmd);
         std::vector<LuaValue> args = { static_cast<int>(player.getID()), cmd };
         EventManager::Get().TriggerEvent("playerCommand", args);
         return true;
+    }
+
+    // PlayerDamageEventHandler implementation
+    void onPlayerDeath(IPlayer& player, IPlayer* killer, int reason) override {
+        int killerId = killer ? static_cast<int>(killer->getID()) : -1;
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            killerId,
+            reason
+        };
+        EventManager::Get().TriggerEvent("playerDeath", args);
+    }
+
+    void onPlayerTakeDamage(IPlayer& player, IPlayer* from, float amount, unsigned weapon, BodyPart part) override {
+        int fromId = from ? static_cast<int>(from->getID()) : -1;
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            fromId,
+            static_cast<double>(amount),
+            static_cast<int>(weapon),
+            static_cast<int>(part)
+        };
+        EventManager::Get().TriggerEvent("playerTakeDamage", args);
+    }
+
+    // PlayerChangeEventHandler implementation
+    void onPlayerKeyStateChange(IPlayer& player, uint32_t newKeys, uint32_t oldKeys) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(newKeys),
+            static_cast<int>(oldKeys)
+        };
+        EventManager::Get().TriggerEvent("playerKeyStateChange", args);
+    }
+
+    void onPlayerStateChange(IPlayer& player, PlayerState newState, PlayerState oldState) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(newState),
+            static_cast<int>(oldState)
+        };
+        EventManager::Get().TriggerEvent("playerStateChange", args);
+    }
+
+    // PlayerClickEventHandler implementation
+    void onPlayerClickMap(IPlayer& player, Vector3 pos) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<double>(pos.x),
+            static_cast<double>(pos.y),
+            static_cast<double>(pos.z)
+        };
+        EventManager::Get().TriggerEvent("playerClickMap", args);
+    }
+
+    // VehicleEventHandler implementation
+    void onPlayerEnterVehicle(IPlayer& player, IVehicle& vehicle, bool passenger) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(vehicle.getID()),
+            passenger
+        };
+        EventManager::Get().TriggerEvent("playerEnterVehicle", args);
+    }
+
+    void onPlayerExitVehicle(IPlayer& player, IVehicle& vehicle) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(vehicle.getID())
+        };
+        EventManager::Get().TriggerEvent("playerExitVehicle", args);
+    }
+
+    void onVehicleDeath(IVehicle& vehicle, IPlayer& player) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(vehicle.getID()),
+            static_cast<int>(player.getID())
+        };
+        EventManager::Get().TriggerEvent("vehicleDeath", args);
+    }
+
+    bool onVehicleMod(IPlayer& player, IVehicle& vehicle, int component) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(vehicle.getID()),
+            component
+        };
+        EventManager::Get().TriggerEvent("vehicleMod", args);
+        return true;
+    }
+
+    bool onVehiclePaintJob(IPlayer& player, IVehicle& vehicle, int paintJob) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(vehicle.getID()),
+            paintJob
+        };
+        EventManager::Get().TriggerEvent("vehiclePaintjob", args);
+        return true;
+    }
+
+    bool onVehicleRespray(IPlayer& player, IVehicle& vehicle, int colour1, int colour2) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(vehicle.getID()),
+            colour1,
+            colour2
+        };
+        EventManager::Get().TriggerEvent("vehicleRespray", args);
+        return true;
+    }
+
+    // PickupEventHandler implementation
+    void onPlayerPickUpPickup(IPlayer& player, IPickup& pickup) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(pickup.getID())
+        };
+        EventManager::Get().TriggerEvent("playerPickUpPickup", args);
+    }
+
+    // PlayerCheckpointEventHandler implementation
+    void onPlayerEnterCheckpoint(IPlayer& player) override {
+        std::vector<LuaValue> args = { static_cast<int>(player.getID()) };
+        EventManager::Get().TriggerEvent("playerEnterCheckpoint", args);
+    }
+
+    void onPlayerLeaveCheckpoint(IPlayer& player) override {
+        std::vector<LuaValue> args = { static_cast<int>(player.getID()) };
+        EventManager::Get().TriggerEvent("playerLeaveCheckpoint", args);
+    }
+
+    void onPlayerEnterRaceCheckpoint(IPlayer& player) override {
+        std::vector<LuaValue> args = { static_cast<int>(player.getID()) };
+        EventManager::Get().TriggerEvent("playerEnterRaceCheckpoint", args);
+    }
+
+    void onPlayerLeaveRaceCheckpoint(IPlayer& player) override {
+        std::vector<LuaValue> args = { static_cast<int>(player.getID()) };
+        EventManager::Get().TriggerEvent("playerLeaveRaceCheckpoint", args);
+    }
+
+    // ActorEventHandler implementation
+    void onPlayerGiveDamageActor(IPlayer& player, IActor& actor, float amount, unsigned weapon, BodyPart part) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(actor.getID()),
+            static_cast<double>(amount),
+            static_cast<int>(weapon),
+            static_cast<int>(part)
+        };
+        EventManager::Get().TriggerEvent("playerGiveDamageActor", args);
     }
 
     // PlayerDialogEventHandler implementation
@@ -196,6 +412,10 @@ private:
     IComponentList* components_ = nullptr;
     IConsoleComponent* console_ = nullptr;
     IDialogsComponent* dialogs_ = nullptr;
+    IVehiclesComponent* vehicles_ = nullptr;
+    IPickupsComponent* pickups_ = nullptr;
+    ICheckpointsComponent* checkpoints_ = nullptr;
+    IActorsComponent* actors_ = nullptr;
 };
 
 } // namespace Resa

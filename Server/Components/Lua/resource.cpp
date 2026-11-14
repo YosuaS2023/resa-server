@@ -236,6 +236,11 @@ bool Resource::Stop() {
     EventManager::Get().TriggerEvent("onResourceStop", args);
 
     EventManager::Get().RemoveListenersForResource(this);
+    RemoveCommandsForResource(this);
+    KillTimersForResource(this);
+    if (manager_) {
+        manager_->RemoveExportsForResource(meta_.name);
+    }
     CleanupLuaEnvironment();
 
     state_ = ResourceState::Stopped;
