@@ -30,6 +30,12 @@ if(BUILD_LUA_COMPONENT)
 	set_property(TARGET lua-lib PROPERTY FOLDER "lib")
 endif()
 
+# MariaDB / MySQL C Connector (for LuaMySQL component)
+# ----------------------------------------------------
+if(BUILD_LUA_MYSQL_COMPONENT)
+	conan_omp_add_lib_opt(mariadb-connector-c 3.4.11 "mariadb-connector-c:with_ssl=False;mariadb-connector-c:with_curl=False;mariadb-connector-c:with_iconv=False")
+endif()
+
 # JSON
 # ----
 conan_omp_add_lib(nlohmann_json 3.9.1)

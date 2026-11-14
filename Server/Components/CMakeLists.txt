@@ -28,6 +28,11 @@ if(BUILD_LUA_COMPONENT)
 	add_subdirectory(Lua)
 endif()
 
+# LuaMySQL
+if(BUILD_LUA_MYSQL_COMPONENT)
+	add_subdirectory(LuaMySQL)
+endif()
+
 # SQLite
 if(BUILD_SQLITE_COMPONENT)
 	add_subdirectory(Databases)

@@ -7,6 +7,7 @@
 #include "resource_manager.hpp"
 #include "event_manager.hpp"
 #include "bindings.hpp"
+#include "mysql_bridge.hpp"
 #include <ghc/filesystem.hpp>
 #include <fstream>
 #include <iostream>
@@ -238,6 +239,7 @@ bool Resource::Stop() {
     EventManager::Get().RemoveListenersForResource(this);
     RemoveCommandsForResource(this);
     KillTimersForResource(this);
+    CleanupMySQLForResource(this);
     if (manager_) {
         manager_->RemoveExportsForResource(meta_.name);
     }

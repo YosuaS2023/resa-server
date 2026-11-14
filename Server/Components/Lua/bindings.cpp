@@ -4,6 +4,7 @@
  */
 
 #include "bindings.hpp"
+#include "mysql_bridge.hpp"
 #include "resource.hpp"
 #include "resource_manager.hpp"
 #include "event_manager.hpp"
@@ -4301,6 +4302,8 @@ void RegisterBindings(lua_State* L, Resource* resource) {
     lua_pushinteger(L, 2); lua_setglobal(L, "RACE_CHECKPOINT_NOTHING");
     lua_pushinteger(L, 3); lua_setglobal(L, "RACE_CHECKPOINT_AIR_NORMAL");
     lua_pushinteger(L, 4); lua_setglobal(L, "RACE_CHECKPOINT_AIR_FINISH");
+
+    RegisterMySQLBindings(L, resource);
 
     // Initialize full FiveM-style exports table with metatable lookup
     const char* exportsDsl = R"lua(
