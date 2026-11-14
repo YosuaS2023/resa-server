@@ -19,6 +19,8 @@
 #include <Server/Components/Timers/timers.hpp>
 #include <Server/Components/Checkpoints/checkpoints.hpp>
 #include <Server/Components/Actors/actors.hpp>
+#include <Server/Components/Variables/variables.hpp>
+#include <Server/Components/Classes/classes.hpp>
 
 namespace Resa {
 
@@ -27,6 +29,7 @@ class LuaComponent final : public IComponent,
                            public PlayerConnectEventHandler,
                            public PlayerSpawnEventHandler,
                            public PlayerTextEventHandler,
+                           public PlayerShotEventHandler,
                            public PlayerDamageEventHandler,
                            public PlayerChangeEventHandler,
                            public PlayerClickEventHandler,
@@ -34,6 +37,8 @@ class LuaComponent final : public IComponent,
                            public PickupEventHandler,
                            public PlayerCheckpointEventHandler,
                            public ActorEventHandler,
+                           public ObjectEventHandler,
+                           public ClassEventHandler,
                            public PlayerDialogEventHandler {
 public:
     PROVIDE_UID(Lua_UID)
@@ -79,6 +84,14 @@ public:
         if (actors_) {
             actors_->getEventDispatcher().addEventHandler(this);
         }
+        objects_ = components->queryComponent<IObjectsComponent>();
+        if (objects_) {
+            objects_->getEventDispatcher().addEventHandler(this);
+        }
+        classes_ = components->queryComponent<IClassesComponent>();
+        if (classes_) {
+            classes_->getEventDispatcher().addEventHandler(this);
+        }
     }
 
     void onReady() override {
@@ -88,6 +101,7 @@ public:
             core_->getPlayers().getPlayerConnectDispatcher().addEventHandler(this);
             core_->getPlayers().getPlayerSpawnDispatcher().addEventHandler(this);
             core_->getPlayers().getPlayerTextDispatcher().addEventHandler(this);
+            core_->getPlayers().getPlayerShotDispatcher().addEventHandler(this);
             core_->getPlayers().getPlayerDamageDispatcher().addEventHandler(this);
             core_->getPlayers().getPlayerChangeDispatcher().addEventHandler(this);
             core_->getPlayers().getPlayerClickDispatcher().addEventHandler(this);
@@ -221,6 +235,12 @@ public:
     }
 
     // PlayerSpawnEventHandler implementation
+    bool onPlayerRequestSpawn(IPlayer& player) override {
+        std::vector<LuaValue> args = { static_cast<int>(player.getID()) };
+        EventManager::Get().TriggerEvent("playerRequestSpawn", args);
+        return true;
+    }
+
     void onPlayerSpawn(IPlayer& player) override {
         std::vector<LuaValue> args = { static_cast<int>(player.getID()) };
         EventManager::Get().TriggerEvent("playerSpawn", args);
@@ -265,6 +285,17 @@ public:
         EventManager::Get().TriggerEvent("playerTakeDamage", args);
     }
 
+    void onPlayerGiveDamage(IPlayer& player, IPlayer& to, float amount, unsigned weapon, BodyPart part) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(to.getID()),
+            static_cast<double>(amount),
+            static_cast<int>(weapon),
+            static_cast<int>(part)
+        };
+        EventManager::Get().TriggerEvent("playerGiveDamage", args);
+    }
+
     // PlayerChangeEventHandler implementation
     void onPlayerKeyStateChange(IPlayer& player, uint32_t newKeys, uint32_t oldKeys) override {
         std::vector<LuaValue> args = {
@@ -293,6 +324,86 @@ public:
             static_cast<double>(pos.z)
         };
         EventManager::Get().TriggerEvent("playerClickMap", args);
+    }
+
+    void onPlayerClickPlayer(IPlayer& player, IPlayer& clicked, PlayerClickSource source) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(clicked.getID()),
+            static_cast<int>(source)
+        };
+        EventManager::Get().TriggerEvent("playerClickPlayer", args);
+    }
+
+    // PlayerShotEventHandler implementation
+    bool onPlayerShotMissed(IPlayer& player, const PlayerBulletData& bulletData) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(bulletData.weapon),
+            0,
+            0,
+            static_cast<double>(bulletData.hitPos.x),
+            static_cast<double>(bulletData.hitPos.y),
+            static_cast<double>(bulletData.hitPos.z)
+        };
+        EventManager::Get().TriggerEvent("playerWeaponShot", args);
+        return true;
+    }
+
+    bool onPlayerShotPlayer(IPlayer& player, IPlayer& target, const PlayerBulletData& bulletData) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(bulletData.weapon),
+            1,
+            static_cast<int>(target.getID()),
+            static_cast<double>(bulletData.hitPos.x),
+            static_cast<double>(bulletData.hitPos.y),
+            static_cast<double>(bulletData.hitPos.z)
+        };
+        EventManager::Get().TriggerEvent("playerWeaponShot", args);
+        return true;
+    }
+
+    bool onPlayerShotVehicle(IPlayer& player, IVehicle& target, const PlayerBulletData& bulletData) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(bulletData.weapon),
+            2,
+            static_cast<int>(target.getID()),
+            static_cast<double>(bulletData.hitPos.x),
+            static_cast<double>(bulletData.hitPos.y),
+            static_cast<double>(bulletData.hitPos.z)
+        };
+        EventManager::Get().TriggerEvent("playerWeaponShot", args);
+        return true;
+    }
+
+    bool onPlayerShotObject(IPlayer& player, IObject& target, const PlayerBulletData& bulletData) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(bulletData.weapon),
+            3,
+            static_cast<int>(target.getID()),
+            static_cast<double>(bulletData.hitPos.x),
+            static_cast<double>(bulletData.hitPos.y),
+            static_cast<double>(bulletData.hitPos.z)
+        };
+        EventManager::Get().TriggerEvent("playerWeaponShot", args);
+        return true;
+    }
+
+    bool onPlayerShotPlayerObject(IPlayer& player, IPlayerObject& target, const PlayerBulletData& bulletData) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(bulletData.weapon),
+            4,
+            static_cast<int>(target.getID()),
+            static_cast<double>(bulletData.hitPos.x),
+            static_cast<double>(bulletData.hitPos.y),
+            static_cast<double>(bulletData.hitPos.z)
+        };
+        EventManager::Get().TriggerEvent("playerWeaponShot", args);
+        return true;
     }
 
     // VehicleEventHandler implementation
@@ -352,6 +463,20 @@ public:
         return true;
     }
 
+    void onVehicleSpawn(IVehicle& vehicle) override {
+        std::vector<LuaValue> args = { static_cast<int>(vehicle.getID()) };
+        EventManager::Get().TriggerEvent("vehicleSpawn", args);
+    }
+
+    void onEnterExitModShop(IPlayer& player, bool enterexit, int interiorID) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            enterexit,
+            interiorID
+        };
+        EventManager::Get().TriggerEvent("enterExitModShop", args);
+    }
+
     // PickupEventHandler implementation
     void onPlayerPickUpPickup(IPlayer& player, IPickup& pickup) override {
         std::vector<LuaValue> args = {
@@ -394,6 +519,30 @@ public:
         EventManager::Get().TriggerEvent("playerGiveDamageActor", args);
     }
 
+    // ObjectEventHandler implementation
+    void onMoved(IObject& object) override {
+        std::vector<LuaValue> args = { static_cast<int>(object.getID()) };
+        EventManager::Get().TriggerEvent("objectMoved", args);
+    }
+
+    void onPlayerObjectMoved(IPlayer& player, IPlayerObject& object) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(object.getID())
+        };
+        EventManager::Get().TriggerEvent("playerObjectMoved", args);
+    }
+
+    // ClassEventHandler implementation
+    bool onPlayerRequestClass(IPlayer& player, unsigned int classId) override {
+        std::vector<LuaValue> args = {
+            static_cast<int>(player.getID()),
+            static_cast<int>(classId)
+        };
+        EventManager::Get().TriggerEvent("playerRequestClass", args);
+        return true;
+    }
+
     // PlayerDialogEventHandler implementation
     void onDialogResponse(IPlayer& player, int dialogId, DialogResponse response, int listItem, StringView inputText) override {
         std::string text(inputText.data(), inputText.length());
@@ -416,6 +565,8 @@ private:
     IPickupsComponent* pickups_ = nullptr;
     ICheckpointsComponent* checkpoints_ = nullptr;
     IActorsComponent* actors_ = nullptr;
+    IObjectsComponent* objects_ = nullptr;
+    IClassesComponent* classes_ = nullptr;
 };
 
 } // namespace Resa

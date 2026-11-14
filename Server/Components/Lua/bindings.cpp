@@ -15,6 +15,8 @@
 #include <Server/Components/Timers/timers.hpp>
 #include <Server/Components/Checkpoints/checkpoints.hpp>
 #include <Server/Components/Actors/actors.hpp>
+#include <Server/Components/Variables/variables.hpp>
+#include <Server/Components/Classes/classes.hpp>
 #include <sstream>
 #include <vector>
 #include <string>
@@ -2958,6 +2960,972 @@ static int Lua_ClearActorAnimations(lua_State* L) {
 }
 
 // ============================================================================
+// 11. Variables (PVar & SVar)
+// ============================================================================
+
+static int Lua_SetPVarInt(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    int val = static_cast<int>(luaL_checkinteger(L, 3));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushboolean(L, false); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    if (pvar) {
+        pvar->setInt(key, val);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_GetPVarInt(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushinteger(L, 0); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    lua_pushinteger(L, pvar ? pvar->getInt(key) : 0);
+    return 1;
+}
+
+static int Lua_SetPVarFloat(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    float val = static_cast<float>(luaL_checknumber(L, 3));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushboolean(L, false); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    if (pvar) {
+        pvar->setFloat(key, val);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_GetPVarFloat(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushnumber(L, 0.0); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    lua_pushnumber(L, pvar ? static_cast<double>(pvar->getFloat(key)) : 0.0);
+    return 1;
+}
+
+static int Lua_SetPVarString(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    const char* val = luaL_checkstring(L, 3);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushboolean(L, false); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    if (pvar) {
+        pvar->setString(key, val);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_GetPVarString(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushstring(L, ""); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    if (pvar) {
+        StringView sv = pvar->getString(key);
+        lua_pushlstring(L, sv.data(), sv.length());
+    } else {
+        lua_pushstring(L, "");
+    }
+    return 1;
+}
+
+static int Lua_DeletePVar(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushboolean(L, false); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    lua_pushboolean(L, pvar ? pvar->erase(key) : false);
+    return 1;
+}
+
+static int Lua_GetPVarType(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* key = luaL_checkstring(L, 2);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushinteger(L, VariableType_None); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    lua_pushinteger(L, pvar ? static_cast<int>(pvar->getType(key)) : VariableType_None);
+    return 1;
+}
+
+static int Lua_GetPVarNameAtIndex(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int index = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushnil(L); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    StringView key;
+    if (pvar && pvar->getKeyAtIndex(index, key)) {
+        lua_pushlstring(L, key.data(), key.length());
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
+static int Lua_GetPVarsUpperIndex(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushinteger(L, 0); return 1; }
+    IPlayerVariableData* pvar = queryExtension<IPlayerVariableData>(player);
+    lua_pushinteger(L, pvar ? pvar->size() : 0);
+    return 1;
+}
+
+static IVariablesComponent* GetVariablesComponent() {
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    return components ? components->queryComponent<IVariablesComponent>() : nullptr;
+}
+
+static int Lua_SetSVarInt(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    int val = static_cast<int>(luaL_checkinteger(L, 2));
+    IVariablesComponent* vars = GetVariablesComponent();
+    if (vars) { vars->setInt(key, val); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetSVarInt(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    IVariablesComponent* vars = GetVariablesComponent();
+    lua_pushinteger(L, vars ? vars->getInt(key) : 0);
+    return 1;
+}
+
+static int Lua_SetSVarFloat(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    float val = static_cast<float>(luaL_checknumber(L, 2));
+    IVariablesComponent* vars = GetVariablesComponent();
+    if (vars) { vars->setFloat(key, val); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetSVarFloat(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    IVariablesComponent* vars = GetVariablesComponent();
+    lua_pushnumber(L, vars ? static_cast<double>(vars->getFloat(key)) : 0.0);
+    return 1;
+}
+
+static int Lua_SetSVarString(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    const char* val = luaL_checkstring(L, 2);
+    IVariablesComponent* vars = GetVariablesComponent();
+    if (vars) { vars->setString(key, val); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetSVarString(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    IVariablesComponent* vars = GetVariablesComponent();
+    if (vars) {
+        StringView sv = vars->getString(key);
+        lua_pushlstring(L, sv.data(), sv.length());
+    } else {
+        lua_pushstring(L, "");
+    }
+    return 1;
+}
+
+static int Lua_DeleteSVar(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    IVariablesComponent* vars = GetVariablesComponent();
+    lua_pushboolean(L, vars ? vars->erase(key) : false);
+    return 1;
+}
+
+static int Lua_GetSVarType(lua_State* L) {
+    const char* key = luaL_checkstring(L, 1);
+    IVariablesComponent* vars = GetVariablesComponent();
+    lua_pushinteger(L, vars ? static_cast<int>(vars->getType(key)) : VariableType_None);
+    return 1;
+}
+
+static int Lua_GetSVarNameAtIndex(lua_State* L) {
+    int index = static_cast<int>(luaL_checkinteger(L, 1));
+    IVariablesComponent* vars = GetVariablesComponent();
+    StringView key;
+    if (vars && vars->getKeyAtIndex(index, key)) {
+        lua_pushlstring(L, key.data(), key.length());
+    } else {
+        lua_pushnil(L);
+    }
+    return 1;
+}
+
+static int Lua_GetSVarsUpperIndex(lua_State* L) {
+    IVariablesComponent* vars = GetVariablesComponent();
+    lua_pushinteger(L, vars ? vars->size() : 0);
+    return 1;
+}
+
+// ============================================================================
+// 12. Classes & Spawn Selection
+// ============================================================================
+
+static WeaponSlots BuildWeaponSlotsFromArgs(lua_State* L, int startIdx) {
+    WeaponSlots weapons;
+    for (int i = 0; i < 3; ++i) {
+        uint8_t w = static_cast<uint8_t>(luaL_optinteger(L, startIdx + i * 2, 0));
+        uint32_t a = static_cast<uint32_t>(luaL_optinteger(L, startIdx + i * 2 + 1, 0));
+        if (w > 0) {
+            weapons[i] = WeaponSlotData(w, a);
+        }
+    }
+    return weapons;
+}
+
+static int Lua_AddPlayerClass(lua_State* L) {
+    int skin = static_cast<int>(luaL_checkinteger(L, 1));
+    float x = static_cast<float>(luaL_checknumber(L, 2));
+    float y = static_cast<float>(luaL_checknumber(L, 3));
+    float z = static_cast<float>(luaL_checknumber(L, 4));
+    float angle = static_cast<float>(luaL_checknumber(L, 5));
+    WeaponSlots weapons = BuildWeaponSlotsFromArgs(L, 6);
+
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    IClassesComponent* classes = components ? components->queryComponent<IClassesComponent>() : nullptr;
+    if (!classes) { lua_pushinteger(L, -1); return 1; }
+    IClass* cls = classes->create(skin, 255, Vector3(x, y, z), angle, weapons);
+    lua_pushinteger(L, cls ? cls->getID() : -1);
+    return 1;
+}
+
+static int Lua_AddPlayerClassEx(lua_State* L) {
+    int team = static_cast<int>(luaL_checkinteger(L, 1));
+    int skin = static_cast<int>(luaL_checkinteger(L, 2));
+    float x = static_cast<float>(luaL_checknumber(L, 3));
+    float y = static_cast<float>(luaL_checknumber(L, 4));
+    float z = static_cast<float>(luaL_checknumber(L, 5));
+    float angle = static_cast<float>(luaL_checknumber(L, 6));
+    WeaponSlots weapons = BuildWeaponSlotsFromArgs(L, 7);
+
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    IClassesComponent* classes = components ? components->queryComponent<IClassesComponent>() : nullptr;
+    if (!classes) { lua_pushinteger(L, -1); return 1; }
+    IClass* cls = classes->create(skin, team, Vector3(x, y, z), angle, weapons);
+    lua_pushinteger(L, cls ? cls->getID() : -1);
+    return 1;
+}
+
+static int Lua_SetSpawnInfo(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int team = static_cast<int>(luaL_checkinteger(L, 2));
+    int skin = static_cast<int>(luaL_checkinteger(L, 3));
+    float x = static_cast<float>(luaL_checknumber(L, 4));
+    float y = static_cast<float>(luaL_checknumber(L, 5));
+    float z = static_cast<float>(luaL_checknumber(L, 6));
+    float angle = static_cast<float>(luaL_checknumber(L, 7));
+    WeaponSlots weapons = BuildWeaponSlotsFromArgs(L, 8);
+
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushboolean(L, false); return 1; }
+    IPlayerClassData* classData = queryExtension<IPlayerClassData>(player);
+    if (classData) {
+        classData->setSpawnInfo(PlayerClass(skin, team, Vector3(x, y, z), angle, weapons));
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_ForceClassSelection(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) {
+        player->forceClassSelection();
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+// ============================================================================
+// 13. Object Movement, Attachment & Per-Player Objects
+// ============================================================================
+
+static int Lua_MoveObject(lua_State* L) {
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    float x = static_cast<float>(luaL_checknumber(L, 2));
+    float y = static_cast<float>(luaL_checknumber(L, 3));
+    float z = static_cast<float>(luaL_checknumber(L, 4));
+    float speed = static_cast<float>(luaL_checknumber(L, 5));
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    IObjectsComponent* objects = components ? components->queryComponent<IObjectsComponent>() : nullptr;
+    if (!objects) { lua_pushboolean(L, false); return 1; }
+    IObject* obj = objects->get(id);
+    if (!obj) { lua_pushboolean(L, false); return 1; }
+    Vector3 rot = obj->getRotation().ToEuler();
+    float rx = static_cast<float>(luaL_optnumber(L, 6, rot.x));
+    float ry = static_cast<float>(luaL_optnumber(L, 7, rot.y));
+    float rz = static_cast<float>(luaL_optnumber(L, 8, rot.z));
+    ObjectMoveData data;
+    data.targetPos = Vector3(x, y, z);
+    data.targetRot = Vector3(rx, ry, rz);
+    data.speed = speed;
+    obj->move(data);
+    lua_pushboolean(L, true);
+    return 1;
+}
+
+static int Lua_StopObject(lua_State* L) {
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    IObjectsComponent* objects = components ? components->queryComponent<IObjectsComponent>() : nullptr;
+    if (!objects) { lua_pushboolean(L, false); return 1; }
+    IObject* obj = objects->get(id);
+    if (obj) { obj->stop(); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_IsObjectMoving(lua_State* L) {
+    int id = static_cast<int>(luaL_checkinteger(L, 1));
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    IObjectsComponent* objects = components ? components->queryComponent<IObjectsComponent>() : nullptr;
+    if (!objects) { lua_pushboolean(L, false); return 1; }
+    IObject* obj = objects->get(id);
+    lua_pushboolean(L, obj ? obj->isMoving() : false);
+    return 1;
+}
+
+static int Lua_AttachObjectToVehicle(lua_State* L) {
+    int objId = static_cast<int>(luaL_checkinteger(L, 1));
+    int vehId = static_cast<int>(luaL_checkinteger(L, 2));
+    float ox = static_cast<float>(luaL_checknumber(L, 3));
+    float oy = static_cast<float>(luaL_checknumber(L, 4));
+    float oz = static_cast<float>(luaL_checknumber(L, 5));
+    float rx = static_cast<float>(luaL_checknumber(L, 6));
+    float ry = static_cast<float>(luaL_checknumber(L, 7));
+    float rz = static_cast<float>(luaL_checknumber(L, 8));
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    IObjectsComponent* objects = components ? components->queryComponent<IObjectsComponent>() : nullptr;
+    IVehiclesComponent* vehicles = components ? components->queryComponent<IVehiclesComponent>() : nullptr;
+    if (!objects || !vehicles) { lua_pushboolean(L, false); return 1; }
+    IObject* obj = objects->get(objId);
+    IVehicle* veh = vehicles->get(vehId);
+    if (obj && veh) {
+        obj->attachToVehicle(*veh, Vector3(ox, oy, oz), Vector3(rx, ry, rz));
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_AttachObjectToPlayer(lua_State* L) {
+    int objId = static_cast<int>(luaL_checkinteger(L, 1));
+    int playerId = static_cast<int>(luaL_checkinteger(L, 2));
+    float ox = static_cast<float>(luaL_checknumber(L, 3));
+    float oy = static_cast<float>(luaL_checknumber(L, 4));
+    float oz = static_cast<float>(luaL_checknumber(L, 5));
+    float rx = static_cast<float>(luaL_checknumber(L, 6));
+    float ry = static_cast<float>(luaL_checknumber(L, 7));
+    float rz = static_cast<float>(luaL_checknumber(L, 8));
+    ICore* core = ResourceManager::Get().GetCore();
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    IObjectsComponent* objects = components ? components->queryComponent<IObjectsComponent>() : nullptr;
+    if (!core || !objects) { lua_pushboolean(L, false); return 1; }
+    IObject* obj = objects->get(objId);
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (obj && player) {
+        obj->attachToPlayer(*player, Vector3(ox, oy, oz), Vector3(rx, ry, rz));
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_CreatePlayerObject(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int modelId = static_cast<int>(luaL_checkinteger(L, 2));
+    float x = static_cast<float>(luaL_checknumber(L, 3));
+    float y = static_cast<float>(luaL_checknumber(L, 4));
+    float z = static_cast<float>(luaL_checknumber(L, 5));
+    float rx = static_cast<float>(luaL_checknumber(L, 6));
+    float ry = static_cast<float>(luaL_checknumber(L, 7));
+    float rz = static_cast<float>(luaL_checknumber(L, 8));
+    float drawDist = static_cast<float>(luaL_optnumber(L, 9, 0.0));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushinteger(L, -1); return 1; }
+    IPlayerObjectData* pod = queryExtension<IPlayerObjectData>(player);
+    IPlayerObject* obj = pod ? pod->create(modelId, Vector3(x, y, z), Vector3(rx, ry, rz), drawDist) : nullptr;
+    lua_pushinteger(L, obj ? obj->getID() : -1);
+    return 1;
+}
+
+static int Lua_DestroyPlayerObject(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (!player) { lua_pushboolean(L, false); return 1; }
+    IPlayerObjectData* pod = queryExtension<IPlayerObjectData>(player);
+    if (pod && pod->get(objId)) {
+        pod->release(objId);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_SetPlayerObjectPos(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    float x = static_cast<float>(luaL_checknumber(L, 3));
+    float y = static_cast<float>(luaL_checknumber(L, 4));
+    float z = static_cast<float>(luaL_checknumber(L, 5));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerObjectData* pod = player ? queryExtension<IPlayerObjectData>(player) : nullptr;
+    IPlayerObject* obj = pod ? pod->get(objId) : nullptr;
+    if (obj) { obj->setPosition(Vector3(x, y, z)); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetPlayerObjectPos(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerObjectData* pod = player ? queryExtension<IPlayerObjectData>(player) : nullptr;
+    IPlayerObject* obj = pod ? pod->get(objId) : nullptr;
+    if (obj) {
+        Vector3 pos = obj->getPosition();
+        lua_pushnumber(L, pos.x);
+        lua_pushnumber(L, pos.y);
+        lua_pushnumber(L, pos.z);
+        return 3;
+    }
+    return 0;
+}
+
+static int Lua_SetPlayerObjectRot(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    float rx = static_cast<float>(luaL_checknumber(L, 3));
+    float ry = static_cast<float>(luaL_checknumber(L, 4));
+    float rz = static_cast<float>(luaL_checknumber(L, 5));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerObjectData* pod = player ? queryExtension<IPlayerObjectData>(player) : nullptr;
+    IPlayerObject* obj = pod ? pod->get(objId) : nullptr;
+    if (obj) { obj->setRotation(Vector3(rx, ry, rz)); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetPlayerObjectRot(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerObjectData* pod = player ? queryExtension<IPlayerObjectData>(player) : nullptr;
+    IPlayerObject* obj = pod ? pod->get(objId) : nullptr;
+    if (obj) {
+        Vector3 rot = obj->getRotation().ToEuler();
+        lua_pushnumber(L, rot.x);
+        lua_pushnumber(L, rot.y);
+        lua_pushnumber(L, rot.z);
+        return 3;
+    }
+    return 0;
+}
+
+static int Lua_MovePlayerObject(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    float x = static_cast<float>(luaL_checknumber(L, 3));
+    float y = static_cast<float>(luaL_checknumber(L, 4));
+    float z = static_cast<float>(luaL_checknumber(L, 5));
+    float speed = static_cast<float>(luaL_checknumber(L, 6));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerObjectData* pod = player ? queryExtension<IPlayerObjectData>(player) : nullptr;
+    IPlayerObject* obj = pod ? pod->get(objId) : nullptr;
+    if (!obj) { lua_pushboolean(L, false); return 1; }
+    Vector3 rot = obj->getRotation().ToEuler();
+    float rx = static_cast<float>(luaL_optnumber(L, 7, rot.x));
+    float ry = static_cast<float>(luaL_optnumber(L, 8, rot.y));
+    float rz = static_cast<float>(luaL_optnumber(L, 9, rot.z));
+    ObjectMoveData data;
+    data.targetPos = Vector3(x, y, z);
+    data.targetRot = Vector3(rx, ry, rz);
+    data.speed = speed;
+    obj->move(data);
+    lua_pushboolean(L, true);
+    return 1;
+}
+
+static int Lua_StopPlayerObject(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerObjectData* pod = player ? queryExtension<IPlayerObjectData>(player) : nullptr;
+    IPlayerObject* obj = pod ? pod->get(objId) : nullptr;
+    if (obj) { obj->stop(); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_IsPlayerObjectMoving(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int objId = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerObjectData* pod = player ? queryExtension<IPlayerObjectData>(player) : nullptr;
+    IPlayerObject* obj = pod ? pod->get(objId) : nullptr;
+    lua_pushboolean(L, obj ? obj->isMoving() : false);
+    return 1;
+}
+
+// ============================================================================
+// 14. Per-Player 3D Text Labels & Label Attachment
+// ============================================================================
+
+static int Lua_Attach3DTextLabelToPlayer(lua_State* L) {
+    int labelId = static_cast<int>(luaL_checkinteger(L, 1));
+    int playerId = static_cast<int>(luaL_checkinteger(L, 2));
+    float ox = static_cast<float>(luaL_checknumber(L, 3));
+    float oy = static_cast<float>(luaL_checknumber(L, 4));
+    float oz = static_cast<float>(luaL_checknumber(L, 5));
+    ICore* core = ResourceManager::Get().GetCore();
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    ITextLabelsComponent* labels = components ? components->queryComponent<ITextLabelsComponent>() : nullptr;
+    if (!core || !labels) { lua_pushboolean(L, false); return 1; }
+    ITextLabel* label = labels->get(labelId);
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (label && player) {
+        label->attachToPlayer(*player, Vector3(ox, oy, oz));
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_Attach3DTextLabelToVehicle(lua_State* L) {
+    int labelId = static_cast<int>(luaL_checkinteger(L, 1));
+    int vehId = static_cast<int>(luaL_checkinteger(L, 2));
+    float ox = static_cast<float>(luaL_checknumber(L, 3));
+    float oy = static_cast<float>(luaL_checknumber(L, 4));
+    float oz = static_cast<float>(luaL_checknumber(L, 5));
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    ITextLabelsComponent* labels = components ? components->queryComponent<ITextLabelsComponent>() : nullptr;
+    IVehiclesComponent* vehicles = components ? components->queryComponent<IVehiclesComponent>() : nullptr;
+    if (!labels || !vehicles) { lua_pushboolean(L, false); return 1; }
+    ITextLabel* label = labels->get(labelId);
+    IVehicle* veh = vehicles->get(vehId);
+    if (label && veh) {
+        label->attachToVehicle(*veh, Vector3(ox, oy, oz));
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_CreatePlayer3DTextLabel(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* text = luaL_checkstring(L, 2);
+    uint32_t color = static_cast<uint32_t>(luaL_checkinteger(L, 3));
+    float x = static_cast<float>(luaL_checknumber(L, 4));
+    float y = static_cast<float>(luaL_checknumber(L, 5));
+    float z = static_cast<float>(luaL_checknumber(L, 6));
+    float drawDist = static_cast<float>(luaL_checknumber(L, 7));
+    int attachedPlayerId = static_cast<int>(luaL_optinteger(L, 8, -1));
+    int attachedVehicleId = static_cast<int>(luaL_optinteger(L, 9, -1));
+    bool testLOS = lua_toboolean(L, 10) != 0;
+
+    ICore* core = ResourceManager::Get().GetCore();
+    IComponentList* components = ResourceManager::Get().GetComponents();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerTextLabelData* ptd = player ? queryExtension<IPlayerTextLabelData>(player) : nullptr;
+    if (!ptd) { lua_pushinteger(L, -1); return 1; }
+
+    IPlayerTextLabel* label = nullptr;
+    if (attachedPlayerId >= 0) {
+        IPlayer* target = core->getPlayers().get(attachedPlayerId);
+        if (target) label = ptd->create(text, Colour::FromRGBA(color), Vector3(x, y, z), drawDist, testLOS, *target);
+    } else if (attachedVehicleId >= 0) {
+        IVehiclesComponent* vehicles = components ? components->queryComponent<IVehiclesComponent>() : nullptr;
+        IVehicle* veh = vehicles ? vehicles->get(attachedVehicleId) : nullptr;
+        if (veh) label = ptd->create(text, Colour::FromRGBA(color), Vector3(x, y, z), drawDist, testLOS, *veh);
+    } else {
+        label = ptd->create(text, Colour::FromRGBA(color), Vector3(x, y, z), drawDist, testLOS);
+    }
+    lua_pushinteger(L, label ? label->getID() : -1);
+    return 1;
+}
+
+static int Lua_DestroyPlayer3DTextLabel(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int labelId = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerTextLabelData* ptd = player ? queryExtension<IPlayerTextLabelData>(player) : nullptr;
+    if (ptd && ptd->get(labelId)) {
+        ptd->release(labelId);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_UpdatePlayer3DTextLabelText(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int labelId = static_cast<int>(luaL_checkinteger(L, 2));
+    uint32_t color = static_cast<uint32_t>(luaL_checkinteger(L, 3));
+    const char* text = luaL_checkstring(L, 4);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayerTextLabelData* ptd = player ? queryExtension<IPlayerTextLabelData>(player) : nullptr;
+    IPlayerTextLabel* label = ptd ? ptd->get(labelId) : nullptr;
+    if (label) {
+        label->setColourAndText(Colour::FromRGBA(color), text);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+// ============================================================================
+// 15. Player Gameplay, Status, HUD & Admin
+// ============================================================================
+
+static int Lua_TogglePlayerControllable(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    bool toggle = lua_toboolean(L, 2) != 0;
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) { player->setControllable(toggle); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GameTextForPlayer(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* text = luaL_checkstring(L, 2);
+    int timeMs = static_cast<int>(luaL_checkinteger(L, 3));
+    int style = static_cast<int>(luaL_checkinteger(L, 4));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) {
+        player->sendGameText(text, Milliseconds(timeMs), style);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_GameTextForAll(lua_State* L) {
+    const char* text = luaL_checkstring(L, 1);
+    int timeMs = static_cast<int>(luaL_checkinteger(L, 2));
+    int style = static_cast<int>(luaL_checkinteger(L, 3));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (core) {
+        core->getPlayers().sendGameTextToAll(text, Milliseconds(timeMs), style);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_SendDeathMessage(lua_State* L) {
+    int killerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int killeeId = static_cast<int>(luaL_checkinteger(L, 2));
+    int weapon = static_cast<int>(luaL_checkinteger(L, 3));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* killee = core->getPlayers().get(killeeId);
+    IPlayer* killer = (killerId >= 0) ? core->getPlayers().get(killerId) : nullptr;
+    if (killee) {
+        for (IPlayer* p : core->getPlayers().entries()) {
+            p->sendDeathMessage(*killee, killer, weapon);
+        }
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_SendDeathMessageToAll(lua_State* L) {
+    int killerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int killeeId = static_cast<int>(luaL_checkinteger(L, 2));
+    int weapon = static_cast<int>(luaL_checkinteger(L, 3));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* killee = core->getPlayers().get(killeeId);
+    IPlayer* killer = (killerId >= 0) ? core->getPlayers().get(killerId) : nullptr;
+    if (killee) {
+        core->getPlayers().sendDeathMessageToAll(killer, *killee, weapon);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_ShowPlayerNameTagForPlayer(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int showPlayerId = static_cast<int>(luaL_checkinteger(L, 2));
+    bool show = lua_toboolean(L, 3) != 0;
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    IPlayer* other = core->getPlayers().get(showPlayerId);
+    if (player && other) {
+        player->toggleOtherNameTag(*other, show);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_SetPlayerWantedLevel(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    unsigned level = static_cast<unsigned>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) { player->setWantedLevel(level); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetPlayerWantedLevel(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    lua_pushinteger(L, player ? static_cast<int>(player->getWantedLevel()) : 0);
+    return 1;
+}
+
+static int Lua_SetPlayerDrunkLevel(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int level = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) { player->setDrunkLevel(level); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetPlayerDrunkLevel(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    lua_pushinteger(L, player ? player->getDrunkLevel() : 0);
+    return 1;
+}
+
+static int Lua_SetPlayerColor(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    uint32_t color = static_cast<uint32_t>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) { player->setColour(Colour::FromRGBA(color)); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetPlayerColor(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    lua_pushinteger(L, player ? static_cast<lua_Integer>(player->getColour().RGBA()) : 0);
+    return 1;
+}
+
+static int Lua_SetPlayerTeam(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int team = static_cast<int>(luaL_checkinteger(L, 2));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) { player->setTeam(team); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetPlayerTeam(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    lua_pushinteger(L, player ? player->getTeam() : 255);
+    return 1;
+}
+
+static int Lua_SetPlayerSkillLevel(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    int skill = static_cast<int>(luaL_checkinteger(L, 2));
+    int level = static_cast<int>(luaL_checkinteger(L, 3));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) {
+        player->setSkillLevel(static_cast<PlayerWeaponSkill>(skill), level);
+        lua_pushboolean(L, true);
+    } else {
+        lua_pushboolean(L, false);
+    }
+    return 1;
+}
+
+static int Lua_GetPlayerState(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    lua_pushinteger(L, player ? static_cast<int>(player->getState()) : PlayerState_None);
+    return 1;
+}
+
+static int Lua_GetPlayerKeys(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) {
+        const PlayerKeyData& kd = player->getKeyData();
+        lua_pushinteger(L, static_cast<lua_Integer>(kd.keys));
+        lua_pushinteger(L, static_cast<lua_Integer>(kd.upDown));
+        lua_pushinteger(L, static_cast<lua_Integer>(kd.leftRight));
+        return 3;
+    }
+    return 0;
+}
+
+static int Lua_Ban(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) { player->ban(); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_BanEx(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    const char* reason = luaL_checkstring(L, 2);
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) { player->ban(reason); lua_pushboolean(L, true); }
+    else { lua_pushboolean(L, false); }
+    return 1;
+}
+
+static int Lua_GetPlayerIp(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) {
+        PeerAddress::AddressString addr;
+        if (PeerAddress::ToString(player->getNetworkData().networkID.address, addr)) {
+            lua_pushlstring(L, addr.data(), addr.length());
+            return 1;
+        }
+    }
+    lua_pushstring(L, "");
+    return 1;
+}
+
+static int Lua_GetPlayerSerial(lua_State* L) {
+    int playerId = static_cast<int>(luaL_checkinteger(L, 1));
+    ICore* core = ResourceManager::Get().GetCore();
+    if (!core) return 0;
+    IPlayer* player = core->getPlayers().get(playerId);
+    if (player) {
+        StringView serial = player->getSerial();
+        lua_pushlstring(L, serial.data(), serial.length());
+    } else {
+        lua_pushstring(L, "");
+    }
+    return 1;
+}
+
+// ============================================================================
 // Registration Entry Point
 // ============================================================================
 
@@ -3137,6 +4105,117 @@ void RegisterBindings(lua_State* L, Resource* resource) {
     lua_register(L, "GetObjectPos", Lua_GetObjectPos);
     lua_register(L, "SetObjectRot", Lua_SetObjectRot);
     lua_register(L, "GetObjectRot", Lua_GetObjectRot);
+    lua_register(L, "MoveObject", Lua_MoveObject);
+    lua_register(L, "StopObject", Lua_StopObject);
+    lua_register(L, "IsObjectMoving", Lua_IsObjectMoving);
+    lua_register(L, "AttachObjectToVehicle", Lua_AttachObjectToVehicle);
+    lua_register(L, "AttachObjectToPlayer", Lua_AttachObjectToPlayer);
+    lua_register(L, "CreatePlayerObject", Lua_CreatePlayerObject);
+    lua_register(L, "DestroyPlayerObject", Lua_DestroyPlayerObject);
+    lua_register(L, "SetPlayerObjectPos", Lua_SetPlayerObjectPos);
+    lua_register(L, "GetPlayerObjectPos", Lua_GetPlayerObjectPos);
+    lua_register(L, "SetPlayerObjectRot", Lua_SetPlayerObjectRot);
+    lua_register(L, "GetPlayerObjectRot", Lua_GetPlayerObjectRot);
+    lua_register(L, "MovePlayerObject", Lua_MovePlayerObject);
+    lua_register(L, "StopPlayerObject", Lua_StopPlayerObject);
+    lua_register(L, "IsPlayerObjectMoving", Lua_IsPlayerObjectMoving);
+
+    // 3D Text Label Attachment & Per-Player 3D Text Labels
+    lua_register(L, "Attach3DTextLabelToPlayer", Lua_Attach3DTextLabelToPlayer);
+    lua_register(L, "Attach3DTextLabelToVehicle", Lua_Attach3DTextLabelToVehicle);
+    lua_register(L, "CreatePlayer3DTextLabel", Lua_CreatePlayer3DTextLabel);
+    lua_register(L, "DestroyPlayer3DTextLabel", Lua_DestroyPlayer3DTextLabel);
+    lua_register(L, "UpdatePlayer3DTextLabelText", Lua_UpdatePlayer3DTextLabelText);
+
+    // Variables (PVar & SVar)
+    lua_register(L, "SetPVarInt", Lua_SetPVarInt);
+    lua_register(L, "GetPVarInt", Lua_GetPVarInt);
+    lua_register(L, "SetPVarFloat", Lua_SetPVarFloat);
+    lua_register(L, "GetPVarFloat", Lua_GetPVarFloat);
+    lua_register(L, "SetPVarString", Lua_SetPVarString);
+    lua_register(L, "GetPVarString", Lua_GetPVarString);
+    lua_register(L, "DeletePVar", Lua_DeletePVar);
+    lua_register(L, "GetPVarType", Lua_GetPVarType);
+    lua_register(L, "GetPVarNameAtIndex", Lua_GetPVarNameAtIndex);
+    lua_register(L, "GetPVarsUpperIndex", Lua_GetPVarsUpperIndex);
+    lua_register(L, "SetSVarInt", Lua_SetSVarInt);
+    lua_register(L, "GetSVarInt", Lua_GetSVarInt);
+    lua_register(L, "SetSVarFloat", Lua_SetSVarFloat);
+    lua_register(L, "GetSVarFloat", Lua_GetSVarFloat);
+    lua_register(L, "SetSVarString", Lua_SetSVarString);
+    lua_register(L, "GetSVarString", Lua_GetSVarString);
+    lua_register(L, "DeleteSVar", Lua_DeleteSVar);
+    lua_register(L, "GetSVarType", Lua_GetSVarType);
+    lua_register(L, "GetSVarNameAtIndex", Lua_GetSVarNameAtIndex);
+    lua_register(L, "GetSVarsUpperIndex", Lua_GetSVarsUpperIndex);
+
+    // Classes & Spawn Selection
+    lua_register(L, "AddPlayerClass", Lua_AddPlayerClass);
+    lua_register(L, "AddPlayerClassEx", Lua_AddPlayerClassEx);
+    lua_register(L, "SetSpawnInfo", Lua_SetSpawnInfo);
+    lua_register(L, "ForceClassSelection", Lua_ForceClassSelection);
+
+    // Player Gameplay, Status, HUD & Admin
+    lua_register(L, "TogglePlayerControllable", Lua_TogglePlayerControllable);
+    lua_register(L, "GameTextForPlayer", Lua_GameTextForPlayer);
+    lua_register(L, "GameTextForAll", Lua_GameTextForAll);
+    lua_register(L, "SendDeathMessage", Lua_SendDeathMessage);
+    lua_register(L, "SendDeathMessageToAll", Lua_SendDeathMessageToAll);
+    lua_register(L, "ShowPlayerNameTagForPlayer", Lua_ShowPlayerNameTagForPlayer);
+    lua_register(L, "SetPlayerWantedLevel", Lua_SetPlayerWantedLevel);
+    lua_register(L, "GetPlayerWantedLevel", Lua_GetPlayerWantedLevel);
+    lua_register(L, "SetPlayerDrunkLevel", Lua_SetPlayerDrunkLevel);
+    lua_register(L, "GetPlayerDrunkLevel", Lua_GetPlayerDrunkLevel);
+    lua_register(L, "SetPlayerColor", Lua_SetPlayerColor);
+    lua_register(L, "GetPlayerColor", Lua_GetPlayerColor);
+    lua_register(L, "SetPlayerTeam", Lua_SetPlayerTeam);
+    lua_register(L, "GetPlayerTeam", Lua_GetPlayerTeam);
+    lua_register(L, "SetPlayerSkillLevel", Lua_SetPlayerSkillLevel);
+    lua_register(L, "GetPlayerState", Lua_GetPlayerState);
+    lua_register(L, "GetPlayerKeys", Lua_GetPlayerKeys);
+    lua_register(L, "Ban", Lua_Ban);
+    lua_register(L, "BanEx", Lua_BanEx);
+    lua_register(L, "GetPlayerIp", Lua_GetPlayerIp);
+    lua_register(L, "GetPlayerSerial", Lua_GetPlayerSerial);
+
+    // Variable Type constants
+    lua_pushinteger(L, VariableType_None); lua_setglobal(L, "PLAYER_VARTYPE_NONE");
+    lua_pushinteger(L, VariableType_Int); lua_setglobal(L, "PLAYER_VARTYPE_INT");
+    lua_pushinteger(L, VariableType_String); lua_setglobal(L, "PLAYER_VARTYPE_STRING");
+    lua_pushinteger(L, VariableType_Float); lua_setglobal(L, "PLAYER_VARTYPE_FLOAT");
+    lua_pushinteger(L, VariableType_None); lua_setglobal(L, "SERVER_VARTYPE_NONE");
+    lua_pushinteger(L, VariableType_Int); lua_setglobal(L, "SERVER_VARTYPE_INT");
+    lua_pushinteger(L, VariableType_String); lua_setglobal(L, "SERVER_VARTYPE_STRING");
+    lua_pushinteger(L, VariableType_Float); lua_setglobal(L, "SERVER_VARTYPE_FLOAT");
+
+    // Player State constants
+    lua_pushinteger(L, PlayerState_None); lua_setglobal(L, "PLAYER_STATE_NONE");
+    lua_pushinteger(L, PlayerState_OnFoot); lua_setglobal(L, "PLAYER_STATE_ONFOOT");
+    lua_pushinteger(L, PlayerState_Driver); lua_setglobal(L, "PLAYER_STATE_DRIVER");
+    lua_pushinteger(L, PlayerState_Passenger); lua_setglobal(L, "PLAYER_STATE_PASSENGER");
+    lua_pushinteger(L, PlayerState_Wasted); lua_setglobal(L, "PLAYER_STATE_WASTED");
+    lua_pushinteger(L, PlayerState_Spawned); lua_setglobal(L, "PLAYER_STATE_SPAWNED");
+    lua_pushinteger(L, PlayerState_Spectating); lua_setglobal(L, "PLAYER_STATE_SPECTATING");
+
+    // Bullet Hit Type constants
+    lua_pushinteger(L, 0); lua_setglobal(L, "BULLET_HIT_TYPE_NONE");
+    lua_pushinteger(L, 1); lua_setglobal(L, "BULLET_HIT_TYPE_PLAYER");
+    lua_pushinteger(L, 2); lua_setglobal(L, "BULLET_HIT_TYPE_VEHICLE");
+    lua_pushinteger(L, 3); lua_setglobal(L, "BULLET_HIT_TYPE_OBJECT");
+    lua_pushinteger(L, 4); lua_setglobal(L, "BULLET_HIT_TYPE_PLAYER_OBJECT");
+
+    // Weapon Skill constants
+    lua_pushinteger(L, 0); lua_setglobal(L, "WEAPONSKILL_PISTOL");
+    lua_pushinteger(L, 1); lua_setglobal(L, "WEAPONSKILL_PISTOL_SILENCED");
+    lua_pushinteger(L, 2); lua_setglobal(L, "WEAPONSKILL_DESERT_EAGLE");
+    lua_pushinteger(L, 3); lua_setglobal(L, "WEAPONSKILL_SHOTGUN");
+    lua_pushinteger(L, 4); lua_setglobal(L, "WEAPONSKILL_SAWNOFF_SHOTGUN");
+    lua_pushinteger(L, 5); lua_setglobal(L, "WEAPONSKILL_SPAS12_SHOTGUN");
+    lua_pushinteger(L, 6); lua_setglobal(L, "WEAPONSKILL_MICRO_UZI");
+    lua_pushinteger(L, 7); lua_setglobal(L, "WEAPONSKILL_MP5");
+    lua_pushinteger(L, 8); lua_setglobal(L, "WEAPONSKILL_AK47");
+    lua_pushinteger(L, 9); lua_setglobal(L, "WEAPONSKILL_M4");
+    lua_pushinteger(L, 10); lua_setglobal(L, "WEAPONSKILL_SNIPERRIFLE");
 
     // Dialog style constants
     lua_pushinteger(L, DialogStyle_MSGBOX);
