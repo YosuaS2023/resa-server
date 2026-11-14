@@ -776,7 +776,9 @@ function(_conan_omp_install_package pkg_name pkg_version pkg_options)
         endif()
 
         if(_translated_pkg_option)
-            list(APPEND _conan_args "--options:host=${_translated_pkg_option}")
+            foreach(_opt IN LISTS _translated_pkg_option)
+                list(APPEND _conan_args "--options:host=${_opt}")
+            endforeach()
         endif()
 
         string(REPLACE ";" " " _conan_args_log "${_conan_args}")
